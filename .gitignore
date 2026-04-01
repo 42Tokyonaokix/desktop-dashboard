@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+cache/
+*.egg-info/
+.venv/
+venv/
+output_wallpaper_*.jpg
