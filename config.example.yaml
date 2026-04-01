@@ -14,7 +14,7 @@ overlay:
 
 # APIキー
 unsplash:
-  access_key: "YOUR_UNSPLASH_ACCESS_KEY"
+  access_key: "YOUR API KEY HERE"
 
 yahoo:
   client_id: ""
