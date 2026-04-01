@@ -41,6 +41,7 @@ class WeatherWallpaperApp:
         self._prev_temperature: Optional[float] = None
         self._current_base_image: Optional[str] = None
         self._output_index = 0  # Alternate between 2 output files
+        self._on_update_callback = None  # callable(weather, mapping)
 
     def tick(self) -> None:
         lat = self._config["location"]["latitude"]
@@ -99,6 +100,9 @@ class WeatherWallpaperApp:
             mapping["description"],
         )
 
+        if self._on_update_callback:
+            self._on_update_callback(weather, mapping)
+
     def run(self) -> None:
         logger.info("Weather Wallpaper Changer started")
         self.tick()  # Run immediately on start
@@ -120,4 +124,15 @@ class WeatherWallpaperApp:
 
 if __name__ == "__main__":
     app = WeatherWallpaperApp()
-    app.run()
+
+    try:
+        from dock_app import DockWeatherApp
+
+        if sys.platform == "darwin" and "--headless" not in sys.argv:
+            dock = DockWeatherApp(app, app._config["check_interval_min"])
+            app._on_update_callback = dock.update_display
+            dock.run()
+        else:
+            app.run()
+    except ImportError:
+        app.run()

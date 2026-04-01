@@ -16,13 +16,22 @@ _BOX_MARGIN = 40
 _LINE_SPACING = 8
 
 
+_FALLBACK_FONTS = [
+    "/System/Library/Fonts/\u30d2\u30e9\u30ae\u30ce\u89d2\u30b4\u30b7\u30c3\u30af W3.ttc",
+    "/Library/Fonts/Arial Unicode.ttf",
+    "/System/Library/Fonts/HelveticaNeue.ttc",
+]
+
+
 def _get_font(size: int) -> ImageFont.FreeTypeFont:
     if os.path.exists(_FONT_PATH):
         return ImageFont.truetype(_FONT_PATH, size)
-    try:
-        return ImageFont.truetype("/System/Library/Fonts/HelveticaNeue.ttc", size)
-    except OSError:
-        return ImageFont.load_default()
+    for fallback in _FALLBACK_FONTS:
+        try:
+            return ImageFont.truetype(fallback, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
 
 
 def render_overlay(
