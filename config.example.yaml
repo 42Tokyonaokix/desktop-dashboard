@@ -1,0 +1,24 @@
+# 位置情報
+location:
+  latitude: 35.6762
+  longitude: 139.6503
+
+# 更新設定
+check_interval_min: 10
+
+# オーバーレイ設定
+overlay:
+  position: bottom_right
+  opacity: 0.7
+  font_size: 48
+
+# APIキー
+unsplash:
+  access_key: "YOUR API KEY HERE"
+
+yahoo:
+  client_id: ""
+
+# キャッシュ設定
+cache:
+  max_images: 50
