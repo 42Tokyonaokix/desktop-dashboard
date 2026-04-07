@@ -23,6 +23,24 @@ DEFAULTS = {
     "cache": {
         "max_images": 50,
     },
+    "obsidian": {
+        "vault_dir": "",
+        "tasks": {
+            "max_items": 8,
+            "status": "todo",
+            "priority": "high",
+        },
+        "motivation_file": "",
+        "check_interval_min": 5,
+    },
+    "dashboard": {
+        "width": 1500,
+        "height": 1000,
+        "sections": ["weather", "tasks", "motivation"],
+        "section_weights": [30, 40, 30],
+        "card_opacity": 0.6,
+        "font_size": 36,
+    },
 }
 
 
@@ -39,7 +57,7 @@ def _deep_merge(base: dict, override: dict) -> dict:
 def load_config(path: str = "config.yaml") -> dict:
     config_path = Path(path)
     if not config_path.exists():
-        return {**DEFAULTS, "unsplash": {"access_key": ""}}
+        return DEFAULTS.copy()
 
     with open(config_path, "r") as f:
         user_config = yaml.safe_load(f) or {}
