@@ -1,25 +1,16 @@
 """Fetch weather data from Open-Meteo API and Yahoo YOLP API."""
 
 import logging
-from dataclasses import dataclass
 from typing import Optional, Dict
 
 import requests
+
+from domain.models import WeatherData
 
 logger = logging.getLogger(__name__)
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 YOLP_URL = "https://map.yahooapis.jp/weather/V1/place"
-
-
-@dataclass
-class WeatherData:
-    temperature: float
-    weather_code: int
-    wind_speed: float
-    temp_max: float
-    temp_min: float
-    precipitation_probability: int
 
 
 def fetch_open_meteo(latitude: float, longitude: float) -> Optional[WeatherData]:

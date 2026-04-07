@@ -1,7 +1,7 @@
 import os
 import tempfile
 from unittest.mock import patch, MagicMock
-from image_fetcher import ImageFetcher
+from infra.image_fetcher import ImageFetcher
 
 
 def test_get_cached_image_when_exists():
@@ -18,7 +18,7 @@ def test_get_cached_image_when_exists():
         assert result == cached_path
 
 
-@patch("image_fetcher.requests.get")
+@patch("infra.image_fetcher.requests.get")
 def test_fetch_from_unsplash_when_no_cache(mock_get):
     with tempfile.TemporaryDirectory() as cache_dir:
         search_resp = MagicMock()

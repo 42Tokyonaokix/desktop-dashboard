@@ -1,4 +1,4 @@
-from weather_mapper import WeatherMapper
+from domain.weather_mapper import WeatherMapper
 
 
 def test_clear_sky_mapping():
