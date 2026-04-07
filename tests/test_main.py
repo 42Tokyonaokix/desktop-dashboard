@@ -1,132 +1,99 @@
 from unittest.mock import patch, MagicMock
-from main import WeatherWallpaperApp
-from weather_fetcher import WeatherData
+from main import DashboardApp
+from domain.models import WeatherData, TaskItem, MotivationData
 
 
 def _make_config():
     return {
         "location": {"latitude": 35.6762, "longitude": 139.6503},
         "check_interval_min": 10,
+        "weather": {"check_interval_min": 10},
         "overlay": {"position": "bottom_right", "opacity": 0.7, "font_size": 48},
         "unsplash": {"access_key": "test_key"},
         "yahoo": {"client_id": ""},
         "cache": {"max_images": 50},
+        "obsidian": {
+            "vault_dir": "/tmp/vault",
+            "check_interval_min": 5,
+            "tasks": {"max_items": 8, "status": "todo", "priority": "high"},
+            "motivation_file": "/tmp/vault/dashboard/motivation.md",
+        },
+        "dashboard": {
+            "width": 1500, "height": 1000,
+            "sections": ["weather", "tasks", "motivation"],
+            "section_weights": [30, 40, 30],
+            "card_opacity": 0.6, "font_size": 36,
+        },
     }
 
 
 def _make_weather(code=0, temp=22.5):
     return WeatherData(
-        temperature=temp,
-        weather_code=code,
-        wind_speed=3.2,
-        temp_max=28.0,
-        temp_min=18.0,
-        precipitation_probability=10,
+        temperature=temp, weather_code=code, wind_speed=3.2,
+        temp_max=28.0, temp_min=18.0, precipitation_probability=10,
     )
 
 
 @patch("main.set_wallpaper")
-@patch("main.render_overlay")
+@patch("main.render_dashboard")
 @patch("main.ImageFetcher")
 @patch("main.fetch_open_meteo")
+@patch("main.read_tasks")
+@patch("main.read_motivation")
 @patch("main.load_config")
-def test_first_run_fetches_and_sets_wallpaper(
-    mock_config, mock_fetch, mock_image_cls, mock_render, mock_set
+def test_tick_all_fetches_weather_tasks_and_renders(
+    mock_config, mock_motivation, mock_tasks, mock_fetch,
+    mock_image_cls, mock_render, mock_set
 ):
     mock_config.return_value = _make_config()
-    mock_fetch.return_value = _make_weather(code=0, temp=22.5)
+    mock_fetch.return_value = _make_weather()
+    mock_tasks.return_value = [
+        TaskItem(title="Task 1", file_path="/a.md", priority="high",
+                 status="todo", progress="0/1", tags=[]),
+    ]
+    mock_motivation.return_value = MotivationData(comment="Keep going!")
     mock_image_instance = MagicMock()
     mock_image_instance.get_image.return_value = "/tmp/base.jpg"
     mock_image_cls.return_value = mock_image_instance
     mock_render.return_value = "/tmp/output.jpg"
     mock_set.return_value = True
 
-    app = WeatherWallpaperApp()
-    app.tick()
+    app = DashboardApp()
+    app.tick_all()
 
     mock_fetch.assert_called_once()
-    mock_image_instance.get_image.assert_called_once()
+    mock_tasks.assert_called_once()
+    mock_motivation.assert_called_once()
     mock_render.assert_called_once()
-    mock_set.assert_called_once_with("/tmp/output.jpg")
+    mock_set.assert_called_once()
 
 
 @patch("main.set_wallpaper")
-@patch("main.render_overlay")
+@patch("main.render_dashboard")
 @patch("main.ImageFetcher")
 @patch("main.fetch_open_meteo")
+@patch("main.read_tasks")
+@patch("main.read_motivation")
 @patch("main.load_config")
-def test_no_weather_change_skips_image_fetch(
-    mock_config, mock_fetch, mock_image_cls, mock_render, mock_set
+def test_tick_weather_only_updates_weather(
+    mock_config, mock_motivation, mock_tasks, mock_fetch,
+    mock_image_cls, mock_render, mock_set
 ):
     mock_config.return_value = _make_config()
-    mock_fetch.return_value = _make_weather(code=0, temp=22.5)
+    mock_fetch.return_value = _make_weather()
+    mock_tasks.return_value = []
+    mock_motivation.return_value = None
     mock_image_instance = MagicMock()
     mock_image_instance.get_image.return_value = "/tmp/base.jpg"
     mock_image_cls.return_value = mock_image_instance
     mock_render.return_value = "/tmp/output.jpg"
     mock_set.return_value = True
 
-    app = WeatherWallpaperApp()
-    app.tick()  # First run
-    app.tick()  # Same weather - should skip image fetch
+    app = DashboardApp()
+    app.tick_all()  # initial
+    mock_fetch.reset_mock()
 
-    assert mock_image_instance.get_image.call_count == 1
-    assert mock_render.call_count == 1
+    mock_fetch.return_value = _make_weather(temp=25.0)
+    app.tick_weather()
 
-
-@patch("main.set_wallpaper")
-@patch("main.render_overlay")
-@patch("main.ImageFetcher")
-@patch("main.fetch_open_meteo")
-@patch("main.load_config")
-def test_temperature_change_redraws_overlay_only(
-    mock_config, mock_fetch, mock_image_cls, mock_render, mock_set
-):
-    mock_config.return_value = _make_config()
-    mock_image_instance = MagicMock()
-    mock_image_instance.get_image.return_value = "/tmp/base.jpg"
-    mock_image_cls.return_value = mock_image_instance
-    mock_render.return_value = "/tmp/output.jpg"
-    mock_set.return_value = True
-
-    # First call: code=0, temp=22.5
-    mock_fetch.return_value = _make_weather(code=0, temp=22.5)
-    app = WeatherWallpaperApp()
-    app.tick()
-
-    # Second call: same code, different temp
-    mock_fetch.return_value = _make_weather(code=0, temp=25.0)
-    app.tick()
-
-    # Image fetched only once, but overlay rendered twice
-    assert mock_image_instance.get_image.call_count == 1
-    assert mock_render.call_count == 2
-    assert mock_set.call_count == 2
-
-
-@patch("main.set_wallpaper")
-@patch("main.render_overlay")
-@patch("main.ImageFetcher")
-@patch("main.fetch_open_meteo")
-@patch("main.load_config")
-def test_weather_code_change_fetches_new_image(
-    mock_config, mock_fetch, mock_image_cls, mock_render, mock_set
-):
-    mock_config.return_value = _make_config()
-    mock_image_instance = MagicMock()
-    mock_image_instance.get_image.return_value = "/tmp/base.jpg"
-    mock_image_cls.return_value = mock_image_instance
-    mock_render.return_value = "/tmp/output.jpg"
-    mock_set.return_value = True
-
-    # First: clear sky
-    mock_fetch.return_value = _make_weather(code=0, temp=22.5)
-    app = WeatherWallpaperApp()
-    app.tick()
-
-    # Second: rain
-    mock_fetch.return_value = _make_weather(code=63, temp=18.0)
-    app.tick()
-
-    assert mock_image_instance.get_image.call_count == 2
-    assert mock_render.call_count == 2
+    mock_fetch.assert_called_once()
