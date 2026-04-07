@@ -4,5 +4,5 @@ cache/
 *.egg-info/
 .venv/
 venv/
-ioutput_wallpaper_*.jpg
+output_wallpaper_*.jpg
 config.yaml
