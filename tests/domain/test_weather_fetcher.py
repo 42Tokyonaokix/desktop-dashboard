@@ -1,6 +1,7 @@
 from unittest.mock import patch, MagicMock
 import json
-from weather_fetcher import fetch_open_meteo, fetch_yolp_rainfall, WeatherData
+from domain.weather_fetcher import fetch_open_meteo, fetch_yolp_rainfall
+from domain.models import WeatherData
 
 
 def _mock_open_meteo_response():
@@ -18,7 +19,7 @@ def _mock_open_meteo_response():
     }
 
 
-@patch("weather_fetcher.requests.get")
+@patch("domain.weather_fetcher.requests.get")
 def test_fetch_open_meteo_success(mock_get):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
@@ -34,14 +35,14 @@ def test_fetch_open_meteo_success(mock_get):
     assert data.precipitation_probability == 10
 
 
-@patch("weather_fetcher.requests.get")
+@patch("domain.weather_fetcher.requests.get")
 def test_fetch_open_meteo_failure_returns_none(mock_get):
     mock_get.side_effect = Exception("Network error")
     data = fetch_open_meteo(35.6762, 139.6503)
     assert data is None
 
 
-@patch("weather_fetcher.requests.get")
+@patch("domain.weather_fetcher.requests.get")
 def test_fetch_yolp_rainfall_success(mock_get):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
@@ -66,7 +67,7 @@ def test_fetch_yolp_rainfall_success(mock_get):
     assert rainfall["observation"] == 1.5
 
 
-@patch("weather_fetcher.requests.get")
+@patch("domain.weather_fetcher.requests.get")
 def test_fetch_yolp_rainfall_no_client_id_returns_none(mock_get):
     rainfall = fetch_yolp_rainfall(35.6762, 139.6503, "")
     assert rainfall is None

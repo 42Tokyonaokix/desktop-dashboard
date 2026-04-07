@@ -1,8 +1,8 @@
 from unittest.mock import patch, MagicMock
-from wallpaper_setter import set_wallpaper
+from infra.wallpaper_setter import set_wallpaper
 
 
-@patch("wallpaper_setter.subprocess.run")
+@patch("infra.wallpaper_setter.subprocess.run")
 def test_set_wallpaper_system_events_success(mock_run):
     mock_run.return_value = MagicMock(returncode=0)
     result = set_wallpaper("/tmp/test.jpg")
@@ -12,7 +12,7 @@ def test_set_wallpaper_system_events_success(mock_run):
     assert "System Events" in args[2]
 
 
-@patch("wallpaper_setter.subprocess.run")
+@patch("infra.wallpaper_setter.subprocess.run")
 def test_set_wallpaper_falls_back_to_finder(mock_run):
     # First call (System Events) fails, second call (Finder) succeeds
     mock_run.side_effect = [
@@ -26,7 +26,7 @@ def test_set_wallpaper_falls_back_to_finder(mock_run):
     assert "Finder" in second_call_script
 
 
-@patch("wallpaper_setter.subprocess.run")
+@patch("infra.wallpaper_setter.subprocess.run")
 def test_set_wallpaper_both_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1)
     result = set_wallpaper("/tmp/test.jpg")
