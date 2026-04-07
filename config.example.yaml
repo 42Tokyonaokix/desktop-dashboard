@@ -19,6 +19,11 @@ unsplash:
 yahoo:
   client_id: ""
 
+# Claude API（励ましコメント生成用）
+claude:
+  api_key: ""
+  model: "claude-haiku-4-5-20251001"
+
 # キャッシュ設定
 cache:
   max_images: 50

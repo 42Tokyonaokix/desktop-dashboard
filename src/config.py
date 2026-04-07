@@ -23,6 +23,10 @@ DEFAULTS = {
     "cache": {
         "max_images": 50,
     },
+    "claude": {
+        "api_key": "",
+        "model": "claude-haiku-4-5-20251001",
+    },
     "obsidian": {
         "vault_dir": "",
         "tasks": {
