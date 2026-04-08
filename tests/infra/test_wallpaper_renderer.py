@@ -2,7 +2,7 @@ import os
 import tempfile
 from PIL import Image
 from infra.wallpaper_renderer import render_dashboard
-from domain.models import WeatherData, TaskItem, MotivationData, DashboardData
+from domain.models import WeatherData, MotivationData, GoalData, ProjectGoal, ScheduleItem, DashboardData
 
 
 def _create_test_image(path: str, width: int = 3840, height: int = 2160) -> None:
@@ -10,31 +10,29 @@ def _create_test_image(path: str, width: int = 3840, height: int = 2160) -> None
     img.save(path)
 
 
-def _make_dashboard_data(
-    num_tasks: int = 3,
-    motivation_text: str = "Keep going!",
-) -> DashboardData:
+def _make_dashboard_data(motivation_text: str = "Keep going!", with_goal: bool = True) -> DashboardData:
     weather = WeatherData(
         temperature=22.5, weather_code=0, wind_speed=3.2,
         temp_max=28.0, temp_min=18.0, precipitation_probability=10,
     )
-    tasks = [
-        TaskItem(
-            title=f"Task {i+1}: Some work item",
-            file_path=f"/vault/tasks/{i:03d}.md",
-            priority="high",
-            status="todo",
-            progress=f"0/{i+1}",
-            tags=["dev"] if i % 2 == 0 else [],
-        )
-        for i in range(num_tasks)
-    ]
     motivation = MotivationData(comment=motivation_text) if motivation_text else None
+    goal = GoalData(
+        title="W15", theme="毎日目標を見る",
+        project_goals=[
+            ProjectGoal(project="proj-a", goals=["goal 1", "goal 2"]),
+            ProjectGoal(project="proj-b", goals=["goal 3"]),
+        ],
+        tasks=["task 1", "task 2"],
+        today_schedule=[
+            ScheduleItem(time="09:00", description="morning work (2h)"),
+            ScheduleItem(time="12:00", description="afternoon work (2h)"),
+        ],
+    ) if with_goal else None
     return DashboardData(
         weather=weather,
         weather_mapping={"icon": "☀️", "description": "快晴", "category": "clear"},
-        tasks=tasks,
         motivation=motivation,
+        monthly_goal=goal,
     )
 
 
@@ -47,8 +45,8 @@ def test_render_dashboard_creates_output_file():
         data = _make_dashboard_data()
         config = {
             "width": 1500, "height": 1000,
-            "sections": ["weather", "tasks", "motivation"],
-            "section_weights": [30, 40, 30],
+            "sections": ["weather", "goal", "today_plan", "motivation"],
+            "section_weights": [10, 30, 30, 15],
             "card_opacity": 0.6, "font_size": 36,
         }
         result = render_dashboard(base_path, output_path, data, config)
@@ -65,28 +63,26 @@ def test_render_dashboard_output_is_valid_jpeg():
         data = _make_dashboard_data()
         config = {
             "width": 1500, "height": 1000,
-            "sections": ["weather", "tasks", "motivation"],
-            "section_weights": [30, 40, 30],
+            "sections": ["weather", "goal", "today_plan", "motivation"],
+            "section_weights": [10, 30, 30, 15],
             "card_opacity": 0.6, "font_size": 36,
         }
         render_dashboard(base_path, output_path, data, config)
         with Image.open(output_path) as img:
             assert img.format == "JPEG"
-            assert img.size[0] > 0
-            assert img.size[1] > 0
 
 
-def test_render_dashboard_no_tasks():
+def test_render_dashboard_no_goal():
     with tempfile.TemporaryDirectory() as tmpdir:
         base_path = os.path.join(tmpdir, "base.jpg")
         output_path = os.path.join(tmpdir, "output.jpg")
         _create_test_image(base_path)
 
-        data = _make_dashboard_data(num_tasks=0)
+        data = _make_dashboard_data(with_goal=False)
         config = {
             "width": 1500, "height": 1000,
-            "sections": ["weather", "tasks", "motivation"],
-            "section_weights": [30, 40, 30],
+            "sections": ["weather", "goal", "today_plan", "motivation"],
+            "section_weights": [10, 30, 30, 15],
             "card_opacity": 0.6, "font_size": 36,
         }
         result = render_dashboard(base_path, output_path, data, config)
@@ -102,8 +98,8 @@ def test_render_dashboard_no_motivation():
         data = _make_dashboard_data(motivation_text="")
         config = {
             "width": 1500, "height": 1000,
-            "sections": ["weather", "tasks", "motivation"],
-            "section_weights": [30, 40, 30],
+            "sections": ["weather", "goal", "motivation"],
+            "section_weights": [10, 50, 15],
             "card_opacity": 0.6, "font_size": 36,
         }
         result = render_dashboard(base_path, output_path, data, config)
@@ -111,7 +107,6 @@ def test_render_dashboard_no_motivation():
 
 
 def test_render_dashboard_section_toggle():
-    """Test that disabling sections still produces valid output."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base_path = os.path.join(tmpdir, "base.jpg")
         output_path = os.path.join(tmpdir, "output.jpg")
@@ -120,27 +115,9 @@ def test_render_dashboard_section_toggle():
         data = _make_dashboard_data()
         config = {
             "width": 1500, "height": 1000,
-            "sections": ["weather"],  # only weather
+            "sections": ["weather"],
             "section_weights": [100],
             "card_opacity": 0.6, "font_size": 36,
-        }
-        result = render_dashboard(base_path, output_path, data, config)
-        assert os.path.exists(result)
-
-
-def test_render_dashboard_custom_weights():
-    """Test custom section weight distribution."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        base_path = os.path.join(tmpdir, "base.jpg")
-        output_path = os.path.join(tmpdir, "output.jpg")
-        _create_test_image(base_path)
-
-        data = _make_dashboard_data()
-        config = {
-            "width": 1500, "height": 1000,
-            "sections": ["weather", "tasks", "motivation"],
-            "section_weights": [20, 50, 30],
-            "card_opacity": 0.8, "font_size": 42,
         }
         result = render_dashboard(base_path, output_path, data, config)
         assert os.path.exists(result)

@@ -12,7 +12,6 @@ from config import load_config
 from domain.weather_fetcher import fetch_open_meteo
 from domain.models import WeatherData, DashboardData
 from domain.weather_mapper import WeatherMapper
-from domain.task_reader import read_tasks
 from domain.motivation_reader import read_motivation
 from domain.goal_reader import read_monthly_goal
 from infra.image_fetcher import ImageFetcher
@@ -46,7 +45,6 @@ class DashboardApp:
         self._output_index = 0
         self._current_weather: Optional[WeatherData] = None
         self._current_mapping: Optional[dict] = None
-        self._current_tasks: list = []
         self._current_motivation = None
         self._current_goal = None
         self._on_update_callback = None
@@ -87,19 +85,8 @@ class DashboardApp:
         self._render_and_set()
 
     def tick_obsidian(self) -> None:
-        """Fetch tasks and motivation from Obsidian vault and re-render."""
+        """Fetch motivation and goals from Obsidian vault and re-render."""
         obs_config = self._config["obsidian"]
-        vault_dir = obs_config.get("vault_dir", "")
-        task_config = obs_config.get("tasks", {})
-
-        if vault_dir:
-            tasks_dir = os.path.join(vault_dir, "tasks")
-            self._current_tasks = read_tasks(
-                tasks_dir,
-                status=task_config.get("status", "todo"),
-                priority=task_config.get("priority", "high"),
-                max_items=task_config.get("max_items", 8),
-            )
 
         motivation_file = obs_config.get("motivation_file", "")
         if motivation_file:
@@ -139,17 +126,6 @@ class DashboardApp:
         self._prev_temperature = weather.temperature
 
         obs_config = self._config["obsidian"]
-        vault_dir = obs_config.get("vault_dir", "")
-        task_config = obs_config.get("tasks", {})
-
-        if vault_dir:
-            tasks_dir = os.path.join(vault_dir, "tasks")
-            self._current_tasks = read_tasks(
-                tasks_dir,
-                status=task_config.get("status", "todo"),
-                priority=task_config.get("priority", "high"),
-                max_items=task_config.get("max_items", 8),
-            )
 
         motivation_file = obs_config.get("motivation_file", "")
         if motivation_file:
@@ -169,7 +145,6 @@ class DashboardApp:
         data = DashboardData(
             weather=self._current_weather,
             weather_mapping=self._current_mapping or {},
-            tasks=self._current_tasks,
             motivation=self._current_motivation,
             monthly_goal=self._current_goal,
         )
@@ -189,12 +164,13 @@ class DashboardApp:
             "Dashboard updated: %s %.1f°C, %d tasks",
             self._current_mapping.get("icon", ""),
             self._current_weather.temperature,
-            len(self._current_tasks),
+            len(self._current_goal.tasks if self._current_goal else []),
         )
 
         if self._on_update_callback:
             self._on_update_callback(
-                self._current_weather, self._current_mapping, len(self._current_tasks)
+                self._current_weather, self._current_mapping,
+                len(self._current_goal.tasks if self._current_goal else [])
             )
 
     def run_headless(self) -> None:

@@ -31,6 +31,7 @@ def _get_font(size: int):
     font_dir = os.path.join(os.path.dirname(__file__), "..", "..", "fonts")
     font_path = os.path.join(font_dir, "NotoSansJP-Regular.ttf")
     fallbacks = [
+        "/System/Library/Fonts/ヒラギノ丸ゴ ProN W4.ttc",
         "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
         "/Library/Fonts/Arial Unicode.ttf",
         "/System/Library/Fonts/HelveticaNeue.ttc",
