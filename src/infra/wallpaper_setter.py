@@ -1,9 +1,32 @@
-"""Set macOS desktop wallpaper via AppleScript subprocess."""
+"""Set macOS desktop wallpaper via NSWorkspace (Sequoia+) with AppleScript fallback."""
 
 import subprocess
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
+
+
+def _set_via_nsworkspace(image_path: str) -> bool:
+    """Set wallpaper via PyObjC NSWorkspace (works on macOS Sequoia)."""
+    try:
+        import AppKit
+        import Foundation
+
+        file_url = Foundation.NSURL.fileURLWithPath_(image_path)
+        ws = AppKit.NSWorkspace.sharedWorkspace()
+        for screen in AppKit.NSScreen.screens():
+            result, error = ws.setDesktopImageURL_forScreen_options_error_(
+                file_url, screen, {}, None
+            )
+            if not result:
+                return False
+        # Restart WallpaperAgent to force refresh
+        subprocess.run(["killall", "WallpaperAgent"], capture_output=True)
+        return True
+    except Exception:
+        logger.exception("Failed to set wallpaper via NSWorkspace")
+        return False
 
 
 def _set_via_system_events(image_path: str) -> bool:
@@ -29,6 +52,11 @@ def _set_via_finder(image_path: str) -> bool:
 
 
 def set_wallpaper(image_path: str) -> bool:
+    if sys.platform == "darwin":
+        if _set_via_nsworkspace(image_path):
+            logger.info("Wallpaper set via NSWorkspace: %s", image_path)
+            return True
+
     if _set_via_system_events(image_path):
         logger.info("Wallpaper set via System Events: %s", image_path)
         return True

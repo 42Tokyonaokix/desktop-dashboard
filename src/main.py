@@ -14,6 +14,7 @@ from domain.models import WeatherData, DashboardData
 from domain.weather_mapper import WeatherMapper
 from domain.task_reader import read_tasks
 from domain.motivation_reader import read_motivation
+from domain.goal_reader import read_monthly_goal
 from infra.image_fetcher import ImageFetcher
 from infra.wallpaper_renderer import render_dashboard
 from infra.wallpaper_setter import set_wallpaper
@@ -47,6 +48,7 @@ class DashboardApp:
         self._current_mapping: Optional[dict] = None
         self._current_tasks: list = []
         self._current_motivation = None
+        self._current_goal = None
         self._on_update_callback = None
 
     def tick_weather(self) -> None:
@@ -103,6 +105,10 @@ class DashboardApp:
         if motivation_file:
             self._current_motivation = read_motivation(motivation_file)
 
+        goal_dir = obs_config.get("goal_dir", "")
+        if goal_dir:
+            self._current_goal = read_monthly_goal(goal_dir)
+
         self._render_and_set()
 
     def tick_all(self) -> None:
@@ -149,6 +155,10 @@ class DashboardApp:
         if motivation_file:
             self._current_motivation = read_motivation(motivation_file)
 
+        goal_dir = obs_config.get("goal_dir", "")
+        if goal_dir:
+            self._current_goal = read_monthly_goal(goal_dir)
+
         self._render_and_set()
 
     def _render_and_set(self) -> None:
@@ -161,6 +171,7 @@ class DashboardApp:
             weather_mapping=self._current_mapping or {},
             tasks=self._current_tasks,
             motivation=self._current_motivation,
+            monthly_goal=self._current_goal,
         )
 
         self._output_index = 1 - self._output_index

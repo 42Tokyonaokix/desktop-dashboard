@@ -4,7 +4,7 @@ import logging
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-from domain.models import DashboardData, TaskItem, MotivationData
+from domain.models import DashboardData, TaskItem, MotivationData, GoalData
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,8 @@ _FALLBACK_FONTS = [
     "/Library/Fonts/Arial Unicode.ttf",
     "/System/Library/Fonts/HelveticaNeue.ttc",
 ]
+
+_EMOJI_FONT_PATH = "/System/Library/Fonts/Apple Color Emoji.ttc"
 
 _CARD_RADIUS = 20
 _CARD_PADDING = 24
@@ -32,6 +34,82 @@ def _get_font(size: int) -> ImageFont.FreeTypeFont:
         except OSError:
             continue
     return ImageFont.load_default()
+
+
+def _get_emoji_font(size: int) -> ImageFont.FreeTypeFont:
+    try:
+        return ImageFont.truetype(_EMOJI_FONT_PATH, size)
+    except OSError:
+        return _get_font(size)
+
+
+def _is_emoji(char: str) -> bool:
+    cp = ord(char)
+    return (
+        0x1F600 <= cp <= 0x1F64F or  # Emoticons
+        0x1F300 <= cp <= 0x1F5FF or  # Misc Symbols
+        0x1F680 <= cp <= 0x1F6FF or  # Transport
+        0x1F900 <= cp <= 0x1F9FF or  # Supplemental
+        0x2600 <= cp <= 0x26FF or    # Misc symbols (☀, ⛅ etc)
+        0x2700 <= cp <= 0x27BF or    # Dingbats
+        0xFE00 <= cp <= 0xFE0F or    # Variation selectors
+        0x200D == cp or              # ZWJ
+        0x20E3 == cp or              # Combining enclosing keycap
+        0x1FA00 <= cp <= 0x1FA6F or  # Chess symbols
+        0x1FA70 <= cp <= 0x1FAFF     # Symbols extended
+    )
+
+
+def _strip_variation_selectors(text: str) -> str:
+    """Remove variation selectors that cause rendering issues."""
+    return "".join(c for c in text if not (0xFE00 <= ord(c) <= 0xFE0F))
+
+
+def _draw_text_with_emoji(
+    draw: ImageDraw.ImageDraw,
+    pos: tuple,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    fill,
+    font_size: int,
+) -> tuple:
+    """Draw text with emoji support. Returns (width, height) of rendered text."""
+    x, y = pos
+    emoji_font = _get_emoji_font(font_size)
+    total_w = 0
+    max_h = 0
+
+    # Split text into emoji and non-emoji segments
+    segments = []
+    current = ""
+    current_is_emoji = False
+    for char in text:
+        is_em = _is_emoji(char)
+        if is_em != current_is_emoji and current:
+            segments.append((current, current_is_emoji))
+            current = ""
+        current += char
+        current_is_emoji = is_em
+    if current:
+        segments.append((current, current_is_emoji))
+
+    for segment_text, is_em in segments:
+        if is_em:
+            clean = _strip_variation_selectors(segment_text)
+            if not clean:
+                continue
+            draw.text((x + total_w, y), clean, font=emoji_font,
+                      fill=fill, embedded_color=True)
+            bbox = draw.textbbox((0, 0), clean, font=emoji_font)
+        else:
+            draw.text((x + total_w, y), segment_text, font=font, fill=fill)
+            bbox = draw.textbbox((0, 0), segment_text, font=font)
+        seg_w = bbox[2] - bbox[0]
+        seg_h = bbox[3] - bbox[1]
+        total_w += seg_w
+        max_h = max(max_h, seg_h)
+
+    return (total_w, max_h)
 
 
 def _draw_card(
@@ -62,7 +140,7 @@ def _render_weather_section(
     desc = mapping.get("description", "")
 
     font_large = _get_font(font_size)
-    font_small = _get_font(max(font_size // 2, 14))
+    font_small = _get_font(max(font_size // 2, 28))
 
     cx = x + _CARD_PADDING
     cy = y + _CARD_PADDING
@@ -70,9 +148,8 @@ def _render_weather_section(
 
     # Line 1: icon + temperature
     text = f"{icon} {weather.temperature:.1f}°C"
-    draw.text((cx, cy), text, font=font_large, fill=white)
-    bbox = draw.textbbox((0, 0), text, font=font_large)
-    cy += (bbox[3] - bbox[1]) + _LINE_SPACING
+    _, h = _draw_text_with_emoji(draw, (cx, cy), text, font_large, white, font_size)
+    cy += h + _LINE_SPACING
 
     # Line 2: description
     draw.text((cx, cy), desc, font=font_small, fill=white)
@@ -98,26 +175,24 @@ def _render_tasks_section(
     """Render task list card."""
     _draw_card(draw, x, y, w, h, opacity)
 
-    font_title = _get_font(max(font_size // 2 + 4, 16))
-    font_item = _get_font(max(font_size // 2 - 2, 12))
-    font_tag = _get_font(max(font_size // 3, 10))
+    font_title = _get_font(max(font_size // 2 + 4, 32))
+    font_item = _get_font(max(font_size // 2 - 2, 24))
+    font_tag = _get_font(max(font_size // 3, 20))
 
     cx = x + _CARD_PADDING
     cy = y + _CARD_PADDING
     white = (255, 255, 255, 255)
     dim = (180, 180, 180, 255)
     tag_color = (140, 200, 255, 255)
+    max_y = y + h - _CARD_PADDING
 
     # Section header
-    draw.text((cx, cy), "📋 Tasks", font=font_title, fill=white)
-    bbox = draw.textbbox((0, 0), "📋 Tasks", font=font_title)
-    cy += (bbox[3] - bbox[1]) + _LINE_SPACING * 2
+    _, header_h = _draw_text_with_emoji(draw, (cx, cy), "📋 Tasks", font_title, white, font_size // 2 + 4)
+    cy += header_h + _LINE_SPACING * 2
 
     if not data.tasks:
         draw.text((cx, cy), "No tasks", font=font_item, fill=dim)
         return
-
-    max_y = y + h - _CARD_PADDING
     for task in data.tasks:
         if cy + 30 > max_y:
             break
@@ -147,18 +222,19 @@ def _render_motivation_section(
     """Render motivation comment card."""
     _draw_card(draw, x, y, w, h, opacity)
 
-    font_title = _get_font(max(font_size // 2 + 4, 16))
-    font_body = _get_font(max(font_size // 2 - 2, 12))
+    font_title = _get_font(max(font_size // 2 + 4, 32))
+    font_body = _get_font(max(font_size // 2 - 2, 24))
 
     cx = x + _CARD_PADDING
     cy = y + _CARD_PADDING
     white = (255, 255, 255, 255)
     dim = (180, 180, 180, 255)
 
+    max_y = y + h - _CARD_PADDING
+
     # Section header
-    draw.text((cx, cy), "💬 Today", font=font_title, fill=white)
-    bbox = draw.textbbox((0, 0), "💬 Today", font=font_title)
-    cy += (bbox[3] - bbox[1]) + _LINE_SPACING * 2
+    _, header_h = _draw_text_with_emoji(draw, (cx, cy), "💬 Today", font_title, white, font_size // 2 + 4)
+    cy += header_h + _LINE_SPACING * 2
 
     if data.motivation is None or not data.motivation.comment:
         draw.text((cx, cy), "No message yet", font=font_body, fill=dim)
@@ -166,7 +242,6 @@ def _render_motivation_section(
 
     # Word-wrap the motivation text within the card width
     max_text_width = w - _CARD_PADDING * 2
-    max_y = y + h - _CARD_PADDING
 
     for line in data.motivation.comment.split("\n"):
         if cy + 20 > max_y:
@@ -206,10 +281,61 @@ def _wrap_text(
     return lines
 
 
+def _render_goal_section(
+    draw: ImageDraw.ImageDraw,
+    x: int, y: int, w: int, h: int,
+    data: DashboardData, font_size: int, opacity: float,
+) -> None:
+    """Render monthly goal card."""
+    _draw_card(draw, x, y, w, h, opacity)
+
+    font_title = _get_font(max(font_size // 2 + 4, 32))
+    font_theme = _get_font(max(font_size // 2, 28))
+    font_item = _get_font(max(font_size // 2 - 2, 24))
+
+    cx = x + _CARD_PADDING
+    cy = y + _CARD_PADDING
+    white = (255, 255, 255, 255)
+    dim = (180, 180, 180, 255)
+    accent = (255, 220, 100, 255)
+    max_y = y + h - _CARD_PADDING
+
+    # Section header
+    _, header_h = _draw_text_with_emoji(draw, (cx, cy), "🎯 Monthly Goal", font_title, white, font_size // 2 + 4)
+    cy += header_h + _LINE_SPACING * 2
+
+    if data.monthly_goal is None:
+        draw.text((cx, cy), "No goal set", font=font_item, fill=dim)
+        return
+
+    # Theme
+    if data.monthly_goal.theme:
+        theme_text = f"「{data.monthly_goal.theme}」"
+        draw.text((cx, cy), theme_text, font=font_theme, fill=accent)
+        bbox = draw.textbbox((0, 0), theme_text, font=font_theme)
+        cy += (bbox[3] - bbox[1]) + _LINE_SPACING * 2
+
+    # Goals
+    for goal in data.monthly_goal.goals:
+        if cy + 30 > max_y:
+            break
+        line = f"▸ {goal}"
+        # Wrap long lines
+        max_text_width = w - _CARD_PADDING * 2
+        wrapped = _wrap_text(draw, line, font_item, max_text_width)
+        for wline in wrapped:
+            if cy + 20 > max_y:
+                break
+            draw.text((cx, cy), wline, font=font_item, fill=white)
+            bbox = draw.textbbox((0, 0), wline, font=font_item)
+            cy += (bbox[3] - bbox[1]) + _LINE_SPACING
+
+
 _SECTION_RENDERERS = {
     "weather": _render_weather_section,
     "tasks": _render_tasks_section,
     "motivation": _render_motivation_section,
+    "goal": _render_goal_section,
 }
 
 

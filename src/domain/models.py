@@ -30,8 +30,16 @@ class MotivationData:
 
 
 @dataclass
+class GoalData:
+    title: str
+    theme: str
+    goals: list[str] = field(default_factory=list)
+
+
+@dataclass
 class DashboardData:
     weather: WeatherData
     weather_mapping: dict
     tasks: list[TaskItem] = field(default_factory=list)
     motivation: Optional[MotivationData] = None
+    monthly_goal: Optional[GoalData] = None

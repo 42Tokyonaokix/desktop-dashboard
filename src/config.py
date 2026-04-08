@@ -35,6 +35,7 @@ DEFAULTS = {
             "priority": "high",
         },
         "motivation_file": "",
+        "goal_dir": "",
         "check_interval_min": 5,
     },
     "dashboard": {
